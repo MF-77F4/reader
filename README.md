@@ -1,6 +1,33 @@
-# reader
+# 阅读器
 
-An Electron application with Vue and TypeScript
+一个安静、专注的桌面阅读器，支持本地书籍管理、阅读进度、书签、标注与多种电子书格式。
+
+![阅读器初始书架界面](docs/images/initial-library.png)
+
+## 下载与使用
+
+### 方式一：下载发布版安装包（推荐）
+
+适合普通 Windows 用户。前往 [GitHub Releases](https://github.com/MF-77F4/reader/releases)，下载最新版本中的 `阅读器-1.0.0-setup.exe`，双击安装即可。
+
+> 首个 Windows 安装包正在准备发布；在此之前，请使用下方的源码构建方式。
+
+### 方式二：从源码构建
+
+适合开发者，需预先安装 [Node.js](https://nodejs.org/)（建议 LTS）和 pnpm。
+
+```powershell
+git clone https://github.com/MF-77F4/reader.git
+cd reader
+pnpm install
+pnpm build:win:unsigned
+```
+
+构建完成后，Windows 安装程序位于 `dist` 目录。若只想在开发模式下启动应用：
+
+```powershell
+pnpm dev
+```
 
 ## Tauri 2 migration
 

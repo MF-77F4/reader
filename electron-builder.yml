@@ -5,9 +5,12 @@ directories:
 compression: maximum
 files:
   - '!**/.vscode/*'
-  - '!src/*'
+  - '!src/**/*'
+  - '!src-tauri/**/*'
   - '!resources/**/*'
   - '!scripts/**/*'
+  - '!docs/**/*'
+  - '!build/**/*'
   - '!electron.vite.config.{js,ts,mjs,cjs}'
   - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
