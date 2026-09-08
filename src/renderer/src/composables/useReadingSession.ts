@@ -123,17 +123,23 @@ export function useReadingSession(options: ReadingSessionOptions) {
       if (!currentBookPath.value || !readerHost.isAvailable()) return
 
       const { offset, progress } = calculateCurrentProgress()
-      readerHost.saveProgress({
+      const path = currentBookPath.value
+      void readerHost.saveProgress({
         filePath: currentBookPath.value,
         offset,
         progress
-      })
-
-      updateBookshelfProgress(currentBookPath.value, progress)
+      }).then((saved) => {
+        if (saved) updateBookshelfProgress(path, progress)
+        else console.error('阅读进度保存失败，未更新书架进度')
+      }).catch((error) => console.error('阅读进度保存失败', error))
     }, 2000)
   }
 
   const goShelf = async (options: { skipSave?: boolean } = {}) => {
+    if (saveTimer) {
+      clearTimeout(saveTimer)
+      saveTimer = null
+    }
     const pathToClose = currentBookPath.value
 
     if (currentBookType.value === 'epub' && !options.skipSave) {
@@ -142,11 +148,24 @@ export function useReadingSession(options: ReadingSessionOptions) {
 
     if (pathToClose && readerHost.isAvailable() && !options.skipSave) {
       const { offset, progress } = calculateCurrentProgress()
-      await readerHost.saveProgress({
+      let saved = false
+      try {
+        saved = await readerHost.saveProgress({
         filePath: pathToClose,
         offset,
         progress
-      })
+        })
+      } catch (error) {
+        console.error('阅读进度保存失败', error)
+      }
+      if (!saved) {
+        await showModal({
+          title: '进度保存失败',
+          message: '当前阅读位置未保存，已保留阅读页面。请检查存储空间或进度文件后重试。',
+          type: 'alert'
+        })
+        return
+      }
 
       updateBookshelfProgress(pathToClose, progress)
     }

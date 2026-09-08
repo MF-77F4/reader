@@ -87,7 +87,7 @@ pub struct ImportResult {
     error: Option<String>,
 }
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum ProgressValue {
     Number(f64),
@@ -129,12 +129,28 @@ fn progress_path(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(app_data_dir(app)?.join("reading_progress.json"))
 }
 
-fn load_progress_map(app: &AppHandle) -> HashMap<String, ProgressValue> {
-    progress_path(app)
-        .ok()
-        .and_then(|path| fs::read_to_string(path).ok())
-        .and_then(|content| serde_json::from_str(&content).ok())
-        .unwrap_or_default()
+static PROGRESS_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+fn read_progress_file(path: &Path) -> Result<HashMap<String, ProgressValue>, String> {
+    match fs::read_to_string(path) {
+        Ok(content) => serde_json::from_str(&content)
+            .map_err(|error| format!("进度文件损坏，已保留原文件：{error}")),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(HashMap::new()),
+        Err(error) => Err(format!("无法读取进度文件：{error}")),
+    }
+}
+
+fn load_progress_map(app: &AppHandle) -> Result<HashMap<String, ProgressValue>, String> {
+    read_progress_file(&progress_path(app)?)
+}
+
+fn move_progress(progress: &mut HashMap<String, ProgressValue>, from: &str, to: &str) {
+    if from == to {
+        return;
+    }
+    if let Some(value) = progress.remove(from) {
+        progress.entry(to.to_string()).or_insert(value);
+    }
 }
 
 fn write_progress_map(
@@ -398,6 +414,64 @@ fn normalize_title_numbers(text: &str) -> String {
 }
 
 #[cfg(test)]
+mod progress_tests {
+    use super::*;
+
+    #[test]
+    fn txt_and_epub_positions_survive_serialization() {
+        let map = HashMap::from([
+            ("book.txt".to_string(), ProgressValue::Number(8192.0)),
+            (
+                "book.epub".to_string(),
+                ProgressValue::Text("epubcfi(/6/2!/4/2:10)".into()),
+            ),
+        ]);
+        let decoded: HashMap<String, ProgressValue> =
+            serde_json::from_str(&serde_json::to_string(&map).unwrap()).unwrap();
+        assert_eq!(decoded, map);
+    }
+
+    #[test]
+    fn migration_preserves_self_and_existing_destination() {
+        let mut map = HashMap::from([
+            ("a".into(), ProgressValue::Number(20.0)),
+            ("b".into(), ProgressValue::Number(40.0)),
+        ]);
+        move_progress(&mut map, "a", "a");
+        assert_eq!(map["a"], ProgressValue::Number(20.0));
+        move_progress(&mut map, "a", "b");
+        assert_eq!(map["b"], ProgressValue::Number(40.0));
+        assert!(!map.contains_key("a"));
+        move_progress(&mut map, "b", "c");
+        assert_eq!(map["c"], ProgressValue::Number(40.0));
+    }
+
+    #[test]
+    fn corrupt_file_is_not_treated_as_empty() {
+        let path = std::env::temp_dir().join(format!(
+            "reader-progress-test-{}-{}.json",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        assert!(read_progress_file(&path).unwrap().is_empty());
+        fs::write(&path, "{broken").unwrap();
+        assert!(read_progress_file(&path).is_err());
+        assert_eq!(fs::read_to_string(&path).unwrap(), "{broken");
+        fs::write(&path, r#"{"book.txt":1024,"book.epub":"epubcfi(/6/2)"}"#).unwrap();
+        let restored = read_progress_file(&path).unwrap();
+        assert_eq!(restored["book.txt"], ProgressValue::Number(1024.0));
+        assert_eq!(
+            restored["book.epub"],
+            ProgressValue::Text("epubcfi(/6/2)".into())
+        );
+        fs::remove_file(path).unwrap();
+    }
+}
+
+#[cfg(test)]
 mod title_rule_tests {
     use super::{parse_toc, TitleRules};
 
@@ -586,36 +660,49 @@ pub fn import_text_copy(app: AppHandle, source_path: String) -> ImportResult {
 }
 
 #[tauri::command]
-pub fn get_progress(app: AppHandle, file_path: String) -> ProgressValue {
-    load_progress_map(&app)
+pub fn get_progress(app: AppHandle, file_path: String) -> Result<ProgressValue, String> {
+    let _guard = PROGRESS_LOCK
+        .lock()
+        .map_err(|_| "进度存储不可用".to_string())?;
+    Ok(load_progress_map(&app)?
         .get(&file_path)
         .cloned()
-        .unwrap_or(ProgressValue::Number(0.0))
+        .unwrap_or(ProgressValue::Number(0.0)))
 }
 
 #[tauri::command]
 pub fn save_progress(app: AppHandle, data: SaveProgressParams) -> bool {
-    let mut progress = load_progress_map(&app);
+    let Ok(_guard) = PROGRESS_LOCK.lock() else {
+        return false;
+    };
+    let Ok(mut progress) = load_progress_map(&app) else {
+        return false;
+    };
     progress.insert(data.file_path, data.offset);
     write_progress_map(&app, &progress).is_ok()
 }
 
 #[tauri::command]
 pub fn delete_progress(app: AppHandle, file_path: String) -> bool {
-    let mut progress = load_progress_map(&app);
+    let Ok(_guard) = PROGRESS_LOCK.lock() else {
+        return false;
+    };
+    let Ok(mut progress) = load_progress_map(&app) else {
+        return false;
+    };
     progress.remove(&file_path);
     write_progress_map(&app, &progress).is_ok()
 }
 
 #[tauri::command]
 pub fn migrate_progress(app: AppHandle, paths: MigrateProgressParams) -> bool {
-    let mut progress = load_progress_map(&app);
-    if !progress.contains_key(&paths.to) {
-        if let Some(value) = progress.get(&paths.from).cloned() {
-            progress.insert(paths.to.clone(), value);
-        }
-    }
-    progress.remove(&paths.from);
+    let Ok(_guard) = PROGRESS_LOCK.lock() else {
+        return false;
+    };
+    let Ok(mut progress) = load_progress_map(&app) else {
+        return false;
+    };
+    move_progress(&mut progress, &paths.from, &paths.to);
     write_progress_map(&app, &progress).is_ok()
 }
 
@@ -625,7 +712,12 @@ pub fn delete_book_cache(app: AppHandle, params: DeleteCacheParams) -> bool {
         .into_iter()
         .flatten()
         .collect::<Vec<_>>();
-    let mut progress = load_progress_map(&app);
+    let Ok(_guard) = PROGRESS_LOCK.lock() else {
+        return false;
+    };
+    let Ok(mut progress) = load_progress_map(&app) else {
+        return false;
+    };
     for path in &related {
         progress.remove(path);
     }
