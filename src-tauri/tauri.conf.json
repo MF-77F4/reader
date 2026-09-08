@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "阅读器",
+  "version": "1.0.0",
+  "identifier": "com.quietreader.client",
+  "build": {
+    "beforeDevCommand": "pnpm run dev:tauri:web",
+    "devUrl": "http://127.0.0.1:1420",
+    "beforeBuildCommand": "pnpm run build:tauri:web",
+    "frontendDist": "../out/tauri-renderer"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "阅读器",
+        "width": 1000,
+        "height": 750,
+        "minWidth": 720,
+        "minHeight": 520,
+        "decorations": false,
+        "backgroundColor": "#e9eaec"
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "../build/icon.png",
+      "../build/icon.icns",
+      "../build/icon.ico"
+    ]
+  }
+}

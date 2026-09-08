@@ -1,0 +1,72 @@
+{
+  "name": "reader",
+  "version": "1.0.0",
+  "description": "A quiet desktop reader for books and notes",
+  "main": "./out/main/index.js",
+  "author": "example.com",
+  "homepage": "https://electron-vite.org",
+  "scripts": {
+    "format": "prettier --write .",
+    "lint": "eslint --cache .",
+    "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
+    "typecheck:web": "vue-tsc --noEmit -p tsconfig.web.json --composite false",
+    "typecheck": "npm run typecheck:node && npm run typecheck:web",
+    "start": "electron-vite preview",
+    "dev": "electron-vite dev",
+    "build": "npm run typecheck && electron-vite build",
+    "dev:tauri:web": "vite --config vite.tauri.config.ts",
+    "build:tauri:web": "vue-tsc --noEmit -p tsconfig.web.json --composite false && vite build --config vite.tauri.config.ts",
+    "dev:tauri": "pnpm run tauri -- dev",
+    "build:tauri": "pnpm run tauri -- build",
+    "tauri": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-tauri.ps1",
+    "configure:android": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/configure-tauri-android.ps1",
+    "init:android": "pnpm run tauri -- android init --ci",
+    "build:android:debug": "pnpm run tauri -- android build --debug --apk --target x86_64 --ci",
+    "build:android:release": "pnpm run tauri -- android build --apk --target aarch64 --ci",
+    "postinstall": "electron-builder install-app-deps",
+    "build:unpack": "set CSC_IDENTITY_AUTO_DISCOVERY=false&& set ELECTRON_BUILDER_DISABLE_BUILD_CACHE=true&& set ELECTRON_BUILDER_RCEDIT_PATH=build\\rcedit&& npm run build && electron-builder --dir",
+    "build:win": "npm run build && electron-builder --win",
+    "build:win:unsigned": "set CSC_IDENTITY_AUTO_DISCOVERY=false&& set ELECTRON_BUILDER_DISABLE_BUILD_CACHE=true&& set ELECTRON_BUILDER_RCEDIT_PATH=build\\rcedit&& npm run build && electron-builder --win",
+    "build:mac": "npm run build && electron-builder --mac",
+    "build:linux": "npm run build && electron-builder --linux"
+  },
+  "dependencies": {
+    "@electron-toolkit/preload": "^3.0.2",
+    "@electron-toolkit/utils": "^4.0.0",
+    "@tauri-apps/api": "^2.11.1",
+    "@tauri-apps/plugin-dialog": "^2.7.2",
+    "@tauri-apps/plugin-fs": "^2.5.1",
+    "electron-window-state": "^5.0.3",
+    "foliate-js": "1.0.1",
+    "iconv-lite": "^0.7.2",
+    "jschardet": "^3.1.4"
+  },
+  "devDependencies": {
+    "@electron-toolkit/eslint-config-prettier": "3.0.0",
+    "@electron-toolkit/eslint-config-ts": "^3.1.0",
+    "@electron-toolkit/tsconfig": "^2.0.0",
+    "@tauri-apps/cli": "^2.11.4",
+    "@types/node": "^22.19.1",
+    "@vitejs/plugin-vue": "^6.0.2",
+    "electron": "^39.2.6",
+    "electron-builder": "^26.0.12",
+    "electron-vite": "^5.0.0",
+    "epubjs": "^0.3.93",
+    "eslint": "^9.39.1",
+    "eslint-plugin-vue": "^10.6.2",
+    "pdfjs-dist": "3.11.174",
+    "prettier": "^3.7.4",
+    "typescript": "^5.9.3",
+    "vite": "^7.2.6",
+    "vue": "^3.5.25",
+    "vue-eslint-parser": "^10.2.0",
+    "vue-tsc": "^3.1.6",
+    "vue-virtual-scroller": "2.0.0-beta.8"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron",
+      "esbuild"
+    ]
+  }
+}

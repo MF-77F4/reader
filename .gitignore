@@ -1,0 +1,13 @@
+node_modules
+dist
+out
+src-tauri/target
+src-tauri/gen
+.DS_Store
+.eslintcache
+*.log*
+resources/python-tools/
+build/python-tools/
+__pycache__/
+*.pyc
+.venv-python-tools/
