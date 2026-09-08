@@ -8,9 +8,9 @@
 
 ### 方式一：下载发布版安装包（推荐）
 
-适合普通 Windows 用户。前往 [GitHub Releases](https://github.com/MF-77F4/reader/releases)，下载最新版本中的 `阅读器-1.0.0-setup.exe`，双击安装即可。
+适合 Windows x64 用户。[下载 Electron v1.0.0 安装包](https://github.com/MF-77F4/reader/releases/download/v1.0.0/reader-1.0.0-windows-x64-setup.exe)，下载后双击安装。版本说明见 [GitHub Release](https://github.com/MF-77F4/reader/releases/tag/v1.0.0)。
 
-> 首个 Windows 安装包正在准备发布；在此之前，请使用下方的源码构建方式。
+> 此安装包未签名，对应源码提交 `e29eaf9`，不包含之后的老板键和进度修复。需要最新代码请使用源码构建方式；Tauri 版本尚未发布。
 
 ### 方式二：从源码构建
 
