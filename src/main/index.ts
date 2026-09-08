@@ -53,6 +53,21 @@ let isBossKeyRegistered = false
 const APP_USER_MODEL_ID = 'com.electron.reader'
 const APP_DISPLAY_NAME = '阅读器'
 
+function releaseBossKey(): void {
+  if (isBossKeyRegistered) globalShortcut.unregister(currentBossKey)
+  isBossKeyRegistered = false
+}
+
+function registerBossKey(): void {
+  if (!mainWindow || mainWindow.isDestroyed() || mainWindow.isMinimized()) return
+  if (isBossKeyRegistered) return
+  try {
+    isBossKeyRegistered = globalShortcut.register(currentBossKey, toggleBossKey)
+  } catch {
+    isBossKeyRegistered = false
+  }
+}
+
 function toggleBossKey(): void {
   if (!mainWindow || mainWindow.isDestroyed()) return
 
@@ -71,14 +86,20 @@ function setBossKey(accelerator: string): { success: boolean; error?: string } {
   if (!normalized) return { success: false, error: '快捷键不能为空' }
   if (normalized === currentBossKey && isBossKeyRegistered) return { success: true }
 
-  if (isBossKeyRegistered) globalShortcut.unregister(currentBossKey)
-  if (!globalShortcut.register(normalized, toggleBossKey)) {
-    isBossKeyRegistered = globalShortcut.register(currentBossKey, toggleBossKey)
-    return { success: false, error: '快捷键可能已被其他程序占用' }
+  // Test the replacement before releasing the working shortcut.
+  if (normalized !== currentBossKey || !isBossKeyRegistered) {
+    try {
+      if (!globalShortcut.register(normalized, toggleBossKey)) {
+        return { success: false, error: '快捷键已被其他程序占用或系统不支持，请更换组合键（例如 Ctrl+Shift+F12）' }
+      }
+    } catch {
+      return { success: false, error: '无效的快捷键，请重新设置' }
+    }
   }
-
+  if (normalized !== currentBossKey) releaseBossKey()
   currentBossKey = normalized
   isBossKeyRegistered = true
+  if (mainWindow?.isMinimized()) releaseBossKey()
   return { success: true }
 }
 
@@ -114,11 +135,17 @@ function createWindow(): void {
 
   mainWindowState.manage(mainWindow)
 
+  mainWindow.on('minimize', releaseBossKey)
+  mainWindow.on('restore', registerBossKey)
+  mainWindow.on('show', registerBossKey)
+  mainWindow.on('focus', registerBossKey)
+
   mainWindow.on('ready-to-show', () => {
     mainWindow?.show()
   })
 
   mainWindow.on('closed', () => {
+    releaseBossKey()
     mainWindow = null
   })
 
@@ -554,11 +581,6 @@ app.whenReady().then(() => {
 
   createWindow()
 
-  isBossKeyRegistered = globalShortcut.register(currentBossKey, toggleBossKey)
-  if (!isBossKeyRegistered) {
-    console.warn('无法注册 F12 老板键：该快捷键可能已被其他程序占用')
-  }
-
   app.on('activate', function () {
     // macOS 特有：点击 Dock 图标且无窗口时，重新创建窗口
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
@@ -566,7 +588,7 @@ app.whenReady().then(() => {
 })
 
 app.on('will-quit', () => {
-  globalShortcut.unregister(currentBossKey)
+  releaseBossKey()
 })
 
 // 当所有窗口关闭时退出应用 (macOS 除外)
